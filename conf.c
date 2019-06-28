@@ -2370,7 +2370,7 @@ struct context **conf_load(struct context **cnt)
         fp = fopen(filename, "r");
 
         if (!fp) {
-            snprintf(filename, PATH_MAX, "%s/motion/motion.conf", sysconfdir);
+            snprintf(filename, PATH_MAX, "/etc/motion/motion.conf");
             fp = fopen(filename, "r");
 
             if (!fp) /* There is no config file.... use defaults. */

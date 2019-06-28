@@ -1877,6 +1877,8 @@ static void mlp_prepare(struct context *cnt){
         cnt->shots = -1;
         cnt->lastframetime = cnt->currenttime;
 
+        MOTION_LOG(INF, TYPE_ALL, NO_ERRNO
+            ,_("Frame rate: %d"), cnt->lastrate);
         if (cnt->conf.minimum_frame_time) {
             cnt->minimum_frame_time_downcounter--;
             if (cnt->minimum_frame_time_downcounter == 0)

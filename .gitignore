@@ -23,3 +23,7 @@ config.h.in
 
 po/*.mo
 .vscode/
+
+cscope.*
+tags
+
