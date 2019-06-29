@@ -2930,7 +2930,7 @@ static void *motion_loop(void *arg)
             mlp_timelapse(cnt);
             mlp_loopback(cnt);
             mlp_parmsupdate(cnt);
-            mlp_frametiming(cnt);
+            // mlp_frametiming(cnt);
         }
     }
 
