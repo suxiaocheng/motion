@@ -26,4 +26,4 @@ po/*.mo
 
 cscope.*
 tags
-
+*.swp
