@@ -19,7 +19,7 @@
 #include "picture.h"
 #include "rotate.h"
 #include "webu.h"
-
+#include <sys/time.h>
 
 #define IMAGE_BUFFER_FLUSH ((unsigned int)-1)
 
@@ -2903,6 +2903,18 @@ static void mlp_frametiming(struct context *cnt){
 
 }
 
+#define TIME_STAMP_CYCLE_COUNT 	14
+#define TIME_STAMP_LENGTH      	60
+
+void get_time(unsigned long *data)
+{
+	struct timeval stamp;
+	gettimeofday(&stamp, NULL);
+	if(data != NULL) {
+		*data = stamp.tv_sec*1000000 + stamp.tv_usec;
+	}
+}
+
 /**
  * motion_loop
  *
@@ -2912,25 +2924,120 @@ static void mlp_frametiming(struct context *cnt){
 static void *motion_loop(void *arg)
 {
     struct context *cnt = arg;
+    unsigned long *time_stamp;
+    unsigned int time_stamp_offset = TIME_STAMP_LENGTH;
+    unsigned long time_before, time_after;
 
-    if (motion_init(cnt) == 0){
+    time_stamp = malloc(sizeof(unsigned long)*TIME_STAMP_CYCLE_COUNT*TIME_STAMP_LENGTH);
+    if (time_stamp == NULL) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, _("Alloc memory fail"));
+    } else if (motion_init(cnt) == 0){
+	time_stamp_offset = 0;
+	{
+		int i, j;
+		for(j=0; j<TIME_STAMP_CYCLE_COUNT; j++) {
+			for(i=0; i<TIME_STAMP_LENGTH; i++) {
+				time_stamp[j*TIME_STAMP_LENGTH + i] = -1;
+			}
+		}
+	}
+
         while (!cnt->finish || cnt->event_stop) {
+	    if(time_stamp_offset >= TIME_STAMP_LENGTH) {
+	        /* calculate timestamp and printout */
+		int i, j;
+		for(j=0; j<TIME_STAMP_CYCLE_COUNT; j++) {
+			for(i=1; i<TIME_STAMP_LENGTH; i++) {
+				if(time_stamp[j*TIME_STAMP_LENGTH + i] == -1) {
+					break;
+				}
+				time_stamp[j*TIME_STAMP_LENGTH] += time_stamp[j*TIME_STAMP_LENGTH + i];
+			}
+			time_stamp[j*TIME_STAMP_LENGTH] /= i;
+		}
+                MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, _("Time used info: "));
+		for(i=0; i<TIME_STAMP_CYCLE_COUNT; i++) {
+			if((time_stamp[i*TIME_STAMP_LENGTH] == -1)) {
+				continue;
+			}
+                    MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, _("\t[%d]: %d"), i, time_stamp[i*TIME_STAMP_LENGTH]);
+		}
+		time_stamp_offset = 0;
+		for(j=0; j<TIME_STAMP_CYCLE_COUNT; j++) {
+			for(i=0; i<TIME_STAMP_LENGTH; i++) {
+				time_stamp[j*TIME_STAMP_LENGTH + i] = -1;
+			}
+		}
+	    }
+            get_time(&time_before);
             mlp_prepare(cnt);
+	    get_time(&time_after);
+	    time_stamp[time_stamp_offset +  0*TIME_STAMP_LENGTH] = time_after - time_before;
+
             if (cnt->get_image) {
+	    	get_time(&time_before);
                 mlp_resetimages(cnt);
-                if (mlp_retry(cnt) == 1)  break;
-                if (mlp_capture(cnt) == 1)  break;
+		get_time(&time_after);
+		time_stamp[time_stamp_offset +1*TIME_STAMP_LENGTH] = time_after - time_before;
+	    	
+		get_time(&time_before);
+	       	if (mlp_retry(cnt) == 1)  break;
+		get_time(&time_after);
+		time_stamp[time_stamp_offset +2*TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    	get_time(&time_before);
+	       	if (mlp_capture(cnt) == 1)  break;
+		get_time(&time_after);
+		time_stamp[time_stamp_offset +3*TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    	get_time(&time_before);
                 mlp_detection(cnt);
+		get_time(&time_after);
+		time_stamp[time_stamp_offset +4*TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    	get_time(&time_before);
                 mlp_tuning(cnt);
+		get_time(&time_after);
+		time_stamp[time_stamp_offset +5*TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    	get_time(&time_before);
                 mlp_overlay(cnt);
+		get_time(&time_after);
+		time_stamp[time_stamp_offset +6*TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    	get_time(&time_before);
                 mlp_actions(cnt);
+		get_time(&time_after);
+		time_stamp[time_stamp_offset +7*TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    	get_time(&time_before);
                 mlp_setupmode(cnt);
+		get_time(&time_after);
+		time_stamp[time_stamp_offset+8 *TIME_STAMP_LENGTH] = time_after - time_before;
             }
+
+	    get_time(&time_before);
             mlp_snapshot(cnt);
+	    get_time(&time_after);
+	    time_stamp[time_stamp_offset+9 *TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    get_time(&time_before);
             mlp_timelapse(cnt);
+	    get_time(&time_after);
+	    time_stamp[time_stamp_offset+10 *TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    get_time(&time_before);
             mlp_loopback(cnt);
+	    get_time(&time_after);
+	    time_stamp[time_stamp_offset+11 *TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    get_time(&time_before);
             mlp_parmsupdate(cnt);
-            // mlp_frametiming(cnt);
+	    get_time(&time_after);
+	    time_stamp[time_stamp_offset+12 *TIME_STAMP_LENGTH] = time_after - time_before;
+
+	    mlp_frametiming(cnt);
+	    time_stamp_offset++;
         }
     }
 
